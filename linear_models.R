@@ -20,30 +20,39 @@ x <- sapply(data, simplify = FALSE, reading_data) %>% ldply()
 names(x) <- c("data_num", "time", "abs")
 
 # Generates a function which creates models for the data.
+x_mod <- x %>% filter(time >= 50)
+
 kinetics_model <- function(df) {
-  lm(abs ~ time, data = x[x$time >= 50,])}
+  lm(abs ~ time, data = df)}
 
-
-x_nest <- x %>% group_by(data_num) %>% 
+x_nest <- x_mod %>% group_by(data_num) %>% 
   nest()
+
 x_nest <- x_nest %>% mutate(model = map(data, kinetics_model))
 x_nest <-  x_nest %>% mutate(resids = map2(data, model, add_residuals),
                              pred = map2(data, model, add_predictions))
 
 
+resids <- unnest(x_nest, resids) %>% select(data_num, time, abs, resid)
+pred <- unnest(x_nest, pred) %>% select(data_num, time, abs, pred)
 
-
-
-
-
-#Testing polts
-x %>% group_by(data_num) %>% filter(time <= 200) %>% ggplot(aes(time,abs))+
-  geom_point(alpha = 0.6)+
-  theme_bw()+
+# Residue Plot
+resid_plot <- ggplot(resids, aes(time,resid))+
+  geom_hline(yintercept = 0, col = "red")+
+  geom_point(alpha = 0.3)+
   facet_wrap(vars(data_num), nrow = 2)+
-  geom_smooth(method = "lm", 
-              data = filter(x,time %in% 50:200), 
-              alpha = 0.3, col = "red")
+  theme_bw()+
+  labs(title = "Residue plot for data")
+
+#Plotting model
+data_plot <- ggplot(x, aes(x = time))+
+  geom_point(aes(y=abs), alpha = 0.3)+
+  facet_wrap(vars(data_num), nrow = 2)+
+  theme_bw()+
+  geom_line(aes(y=pred), data = pred, col = "red")
+
+data_plot
+resid_plot
 
 
 
